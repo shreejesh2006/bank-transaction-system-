@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account Overview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Customer Portal</div>
+      <nav class="nav">
+        <a href="customer.html">Dashboard</a>
+        <a class="active" href="account-overview.html">Account Overview</a>
+        <a href="transactions.html">Transactions</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+    <main class="content">
+      <header class="topbar"><strong>Account Overview</strong></header>
+      <article class="card">
+        <div class="toolbar">
+          <input id="accountInput" placeholder="Enter account number" />
+          <button id="loadBtn">Load Account</button>
+        </div>
+        <div id="result" class="muted">Enter account number to view details</div>
+      </article>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    BTS.requireRole("CUSTOMER");
+    document.getElementById("loadBtn").addEventListener("click", async () => {
+      const num = document.getElementById("accountInput").value.trim();
+      if (!num) return;
+      try {
+        const data = await BTS.api(`/customer/accounts/${num}`);
+        if (!data) {
+          document.getElementById("result").textContent = "Account not found";
+          return;
+        }
+        document.getElementById("result").innerHTML = `
+          <p><strong>Account:</strong> ${data.account_number}</p>
+          <p><strong>Type:</strong> ${data.account_type}</p>
+          <p><strong>Balance:</strong> ${BTS.money(data.balance)}</p>
+          <p><strong>Status:</strong> <span class="badge ${BTS.badgeForStatus(data.status)}">${data.status}</span></p>
+          <p><strong>Branch:</strong> ${data.branch_name} (${data.branch_code})</p>
+        `;
+      } catch (error) {
+        document.getElementById("result").textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DBMS Demo Scenario Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Demo Engine</div>
+      <nav class="nav">
+        <a href="admin.html">Dashboard</a>
+        <a class="active" href="demo-panel.html">Demo Panel</a>
+        <a href="recovery-logs.html">Recovery Logs</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <strong>DBMS Demo Scenario Engine</strong>
+          <div class="muted">Run ACID, rollback, crash and concurrency demonstrations</div>
+        </div>
+      </header>
+      <article class="card">
+        <div class="toolbar">
+          <button id="btnReset" class="secondary">Reset Demo State</button>
+        </div>
+        <table>
+          <thead><tr><th>Code</th><th>Title</th><th>Concept</th><th>Expected</th><th>Action</th></tr></thead>
+          <tbody id="body"></tbody>
+        </table>
+      </article>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    BTS.requireRole("ADMIN");
+    const scenarioState = new Map();
+
+    const stepTemplates = {
+      SCN_DEVICE_SHUTDOWN: [
+        "Transfer request submitted from customer app",
+        "System opens transaction and locks relevant accounts",
+        "Failure injected: device shutdown before commit",
+        "Transaction is rolled back automatically",
+        "Recovery log entry confirms no partial transfer"
+      ],
+      SCN_SERVER_CRASH_TRANSFER: [
+        "Transfer started with debit/credit flow",
+        "Sender row lock acquired and debit attempted",
+        "Failure injected: simulated server crash after debit stage",
+        "Rollback executed to restore sender balance",
+        "Recovery log stored for forensic tracking"
+      ],
+      SCN_NETWORK_DISCONNECT: [
+        "Request reached backend and began SQL transaction",
+        "Failure injected: network disconnect during processing",
+        "No duplicate debit written",
+        "Atomic rollback ensures balance consistency",
+        "System records failure outcome for audit"
+      ],
+      SCN_DB_LOCK_LOST_UPDATE: [
+        "Concurrent updates target same account",
+        "FOR UPDATE lock applied to first transaction",
+        "Second transaction waits until lock release",
+        "Update completes without overwriting another",
+        "Lost update is prevented by isolation control"
+      ],
+      SCN_ATM_FAILURE: [
+        "ATM payout flow initiated",
+        "Failure injected after debit-like stage",
+        "Consistency check detects incomplete flow",
+        "Rollback/recovery logic resolves mismatch",
+        "Final ledger state remains consistent"
+      ],
+      SCN_BILLPAY_INTERRUPTED: [
+        "Bill payment transaction started",
+        "Failure injected due to interruption/power cut",
+        "No half-complete payment state persists",
+        "Atomic rollback is applied",
+        "Recovery logs capture interrupted execution"
+      ],
+      SCN_SYSTEM_CRASH_RECOVERY: [
+        "Transaction enters uncommitted phase",
+        "Crash injected before commit",
+        "Uncommitted work detected during recovery",
+        "Rollback restores pre-transaction values",
+        "Durability guarantee preserved for committed data only"
+      ]
+    };
+
+    function renderDetailContent(s) {
+      const state = scenarioState.get(s.scenario_code) || {};
+      if (!state.lastRun) {
+        return `<div class="muted">Click <strong>Run Demo</strong> to execute this scenario and view step-by-step outcome.</div>`;
+      }
+
+      const run = state.lastRun;
+      const dbResponse = run.dbResponse || {};
+      const steps = stepTemplates[s.scenario_code] || [
+        "Scenario started",
+        "Transaction processing",
+        "Failure/lock behavior applied",
+        "Recovery/rollback handled",
+        "Execution completed"
+      ];
+
+      return `
+        <div class="demo-grid">
+          <div>
+            <div><strong>Expected:</strong> ${run.expectedResult}</div>
+            <div><strong>Actual:</strong> ${run.actualResult}</div>
+            <div style="margin-top:6px;">
+              <span class="badge ${dbResponse.result === "SUCCESS" ? "success" : "warning"}">${dbResponse.result || "EXECUTED"}</span>
+              <span class="badge success">Step Trace Ready</span>
+            </div>
+          </div>
+          <ol class="demo-steps">
+            ${steps.map((step) => `<li>${step}</li>`).join("")}
+          </ol>
+        </div>
+      `;
+    }
+
+    function renderScenarios(scenarios) {
+      const html = scenarios.map((s) => {
+        const state = scenarioState.get(s.scenario_code) || { expanded: false, loading: false };
+        const detailClass = state.expanded ? "demo-detail-row open" : "demo-detail-row";
+        const runLabel = state.loading ? "Running..." : "Run Demo";
+
+        return `
+          <tr class="demo-head-row" data-code="${s.scenario_code}">
+            <td>${s.scenario_code}</td>
+            <td>${s.title}</td>
+            <td>${s.dbms_concept}</td>
+            <td>${s.expected_result}</td>
+            <td><button onclick="runScenario('${s.scenario_code}')" ${state.loading ? "disabled" : ""}>${runLabel}</button></td>
+          </tr>
+          <tr class="${detailClass}">
+            <td colspan="5">
+              <div class="demo-detail-box">
+                ${renderDetailContent(s)}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      document.getElementById("body").innerHTML = html;
+      document.querySelectorAll(".demo-head-row").forEach((row) => {
+        row.addEventListener("click", (e) => {
+          if (e.target.tagName === "BUTTON") return;
+          const code = row.dataset.code;
+          const current = scenarioState.get(code) || { expanded: false };
+          scenarioState.set(code, { ...current, expanded: !current.expanded });
+          renderScenarios(scenarios);
+        });
+      });
+    }
+
+    async function loadScenarios() {
+      const scenarios = await BTS.api("/demo/scenarios");
+      scenarios.forEach((s) => {
+        if (!scenarioState.has(s.scenario_code)) {
+          scenarioState.set(s.scenario_code, { expanded: false, loading: false, lastRun: null });
+        }
+      });
+      window._scenariosCache = scenarios;
+      renderScenarios(scenarios);
+    }
+
+    async function runScenario(code) {
+      const state = scenarioState.get(code) || {};
+      scenarioState.set(code, { ...state, loading: true, expanded: true });
+      renderScenarios(window._scenariosCache || []);
+
+      try {
+        const data = await BTS.api(`/demo/run/${code}`, { method: "POST" });
+        const doneState = scenarioState.get(code) || {};
+        scenarioState.set(code, {
+          ...doneState,
+          loading: false,
+          expanded: true,
+          lastRun: data
+        });
+      } catch (error) {
+        const failState = scenarioState.get(code) || {};
+        scenarioState.set(code, {
+          ...failState,
+          loading: false,
+          expanded: true,
+          lastRun: {
+            expectedResult: "Safe failure handling",
+            actualResult: error.message,
+            dbResponse: { result: "FAILED" }
+          }
+        });
+      }
+
+      renderScenarios(window._scenariosCache || []);
+    }
+    window.runScenario = runScenario;
+
+    document.getElementById("btnReset").addEventListener("click", async () => {
+      await BTS.api("/demo/reset", { method: "POST" });
+      scenarioState.forEach((value, key) => {
+        scenarioState.set(key, { ...value, lastRun: null, loading: false, expanded: false });
+      });
+      renderScenarios(window._scenariosCache || []);
+    });
+
+    loadScenarios().catch((e) => alert(e.message));
+  </script>
+</body>
+</html>

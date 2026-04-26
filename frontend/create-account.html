@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account - Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Admin Panel</div>
+      <nav class="nav">
+        <a href="admin.html">Dashboard</a>
+        <a class="active" href="create-account.html">Create Account</a>
+        <a href="reports.html">Reports</a>
+        <a href="audit-logs.html">Audit Logs</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+
+    <main class="content">
+      <header class="topbar"><strong>Create Banking Records</strong></header>
+      <section class="grid grid-2">
+        <article class="card">
+          <h3>Create Customer</h3>
+          <form id="customerForm" class="form-grid">
+            <label>Full Name<input name="fullName" required /></label>
+            <label>Email<input name="email" type="email" required /></label>
+            <label>Phone<input name="phone" required /></label>
+            <label>Password<input name="password" type="password" minlength="8" required /></label>
+            <label>Customer Code<input name="customerCode" placeholder="CUST-2026..." /></label>
+            <label>Address<textarea name="address" rows="2" required></textarea></label>
+            <button type="submit">Create Customer</button>
+          </form>
+        </article>
+
+        <article class="card">
+          <h3>Create Bank Account</h3>
+          <form id="accountForm" class="form-grid">
+            <label>Customer Code<input name="customerCode" required /></label>
+            <label>Branch Code<input name="branchCode" value="BR001" required /></label>
+            <label>Type
+              <select name="accountType"><option>SAVINGS</option><option>CURRENT</option></select>
+            </label>
+            <label>Opening Balance<input name="openingBalance" type="number" min="0" step="0.01" value="0" /></label>
+            <button type="submit">Create Account</button>
+          </form>
+        </article>
+      </section>
+      <p id="msg" class="muted"></p>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    BTS.requireRole("ADMIN");
+    const msg = document.getElementById("msg");
+
+    document.getElementById("customerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      try {
+        await BTS.api("/admin/customers", {
+          method: "POST",
+          body: JSON.stringify(Object.fromEntries(form.entries()))
+        });
+        msg.textContent = "Customer created";
+        e.target.reset();
+      } catch (error) {
+        msg.textContent = error.message;
+      }
+    });
+
+    document.getElementById("accountForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const payload = Object.fromEntries(form.entries());
+      payload.openingBalance = Number(payload.openingBalance || 0);
+      try {
+        const data = await BTS.api("/admin/accounts", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        msg.textContent = `Account created: ${data.account_number}`;
+      } catch (error) {
+        msg.textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>

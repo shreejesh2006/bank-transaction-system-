@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transfer Funds</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Customer Portal</div>
+      <nav class="nav">
+        <a href="customer.html">Dashboard</a>
+        <a class="active" href="transfer.html">Transfer</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+    <main class="content">
+      <header class="topbar"><strong>Fund Transfer</strong></header>
+      <article class="card">
+        <form id="form" class="form-grid">
+          <label>From Account<input name="fromAccountNumber" required /></label>
+          <label>To Account<input name="toAccountNumber" required /></label>
+          <label>Amount<input name="amount" type="number" min="1" step="0.01" required /></label>
+          <label>Remarks<input name="remarks" value="Fund transfer" /></label>
+          <button type="submit">Transfer</button>
+        </form>
+        <p id="msg" class="muted"></p>
+      </article>
+    </main>
+  </div>
+  <script src="assets/app.js"></script>
+  <script>
+    BTS.requireRole("CUSTOMER");
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      payload.amount = Number(payload.amount);
+      try {
+        const data = await BTS.api("/customer/transfer", { method: "POST", body: JSON.stringify(payload) });
+        document.getElementById("msg").textContent = `Transfer success. Ref: ${data.transaction_ref}`;
+      } catch (error) {
+        document.getElementById("msg").textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>

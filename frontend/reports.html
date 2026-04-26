@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reports and Analytics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Analytics</div>
+      <nav class="nav">
+        <a href="admin.html">Admin Dashboard</a>
+        <a class="active" href="reports.html">Reports</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+    <main class="content">
+      <header class="topbar"><strong>Branch Performance & Suspicious Activity</strong></header>
+      <section class="grid grid-2">
+        <article class="card">
+          <h3>Branch Performance</h3>
+          <table>
+            <thead><tr><th>Branch</th><th>Accounts</th><th>Customers</th><th>Total Balance</th></tr></thead>
+            <tbody id="branchBody"></tbody>
+          </table>
+        </article>
+        <article class="card">
+          <h3>Suspicious Transactions</h3>
+          <table>
+            <thead><tr><th>Reference</th><th>Amount</th><th>Status</th><th>Time</th></tr></thead>
+            <tbody id="susBody"></tbody>
+          </table>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    BTS.requireRole("ADMIN", "EMPLOYEE");
+
+    async function loadReports() {
+      const user = BTS.getUser();
+      const branches = user.role === "EMPLOYEE"
+        ? await BTS.api("/employee/reports/branch")
+        : await BTS.api("/admin/reports/branches");
+
+      document.getElementById("branchBody").innerHTML = branches.map((b) => `
+        <tr>
+          <td>${b.branch_name} (${b.branch_code})</td>
+          <td>${b.total_accounts}</td>
+          <td>${b.total_customers}</td>
+          <td>${BTS.money(b.total_balance)}</td>
+        </tr>
+      `).join("");
+
+      if (user.role === "ADMIN") {
+        const suspicious = await BTS.api("/admin/suspicious-transactions");
+        document.getElementById("susBody").innerHTML = suspicious.map((s) => `
+          <tr>
+            <td>${s.transaction_ref}</td>
+            <td>${BTS.money(s.amount)}</td>
+            <td><span class="badge ${BTS.badgeForStatus(s.status)}">${s.status}</span></td>
+            <td>${new Date(s.created_at).toLocaleString()}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    loadReports().catch((e) => alert(e.message));
+  </script>
+</body>
+</html>

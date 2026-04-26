@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings / Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Settings</div>
+      <nav class="nav">
+        <a href="customer.html">Customer</a>
+        <a href="admin.html">Admin</a>
+        <a class="active" href="settings.html">Settings</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+    <main class="content">
+      <header class="topbar"><strong>Profile & System Settings</strong></header>
+      <section id="customerSection" class="grid grid-2" style="display:none;">
+        <article class="card">
+          <h3>Update Profile</h3>
+          <form id="profileForm" class="form-grid">
+            <label>Full Name<input name="fullName" /></label>
+            <label>Phone<input name="phone" /></label>
+            <button type="submit">Update</button>
+          </form>
+        </article>
+        <article class="card">
+          <h3>Change Password</h3>
+          <form id="passwordForm" class="form-grid">
+            <label>Current Password<input name="currentPassword" type="password" required /></label>
+            <label>New Password<input name="newPassword" type="password" minlength="8" required /></label>
+            <button type="submit">Change Password</button>
+          </form>
+        </article>
+      </section>
+
+      <section id="adminSection" class="card" style="display:none;">
+        <h3>System Status Controls</h3>
+        <table>
+          <thead><tr><th>Component</th><th>Status</th><th>Notes</th><th>Action</th></tr></thead>
+          <tbody id="statusBody"></tbody>
+        </table>
+      </section>
+      <p id="msg" class="muted"></p>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const user = BTS.getUser();
+    if (!user) window.location.href = "index.html";
+
+    const msg = document.getElementById("msg");
+
+    if (user.role === "CUSTOMER") {
+      document.getElementById("customerSection").style.display = "grid";
+
+      document.getElementById("profileForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const payload = Object.fromEntries(new FormData(e.target).entries());
+        try {
+          await BTS.api("/customer/profile", { method: "PATCH", body: JSON.stringify(payload) });
+          msg.textContent = "Profile updated";
+        } catch (error) {
+          msg.textContent = error.message;
+        }
+      });
+
+      document.getElementById("passwordForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const payload = Object.fromEntries(new FormData(e.target).entries());
+        try {
+          await BTS.api("/customer/change-password", { method: "PATCH", body: JSON.stringify(payload) });
+          msg.textContent = "Password changed";
+          e.target.reset();
+        } catch (error) {
+          msg.textContent = error.message;
+        }
+      });
+    } else if (user.role === "ADMIN") {
+      document.getElementById("adminSection").style.display = "block";
+      BTS.api("/admin/settings/system-status").then((rows) => {
+        document.getElementById("statusBody").innerHTML = rows.map((r) => `
+          <tr>
+            <td>${r.component}</td>
+            <td><span class="status-dot ${r.status === "UP" ? "up" : "down"}"></span>${r.status}</td>
+            <td>${r.notes || "-"}</td>
+            <td><button onclick="toggleStatus('${r.component}','${r.status}')">Toggle</button></td>
+          </tr>
+        `).join("");
+      }).catch((e) => alert(e.message));
+
+      window.toggleStatus = async (component, status) => {
+        const next = status === "UP" ? "DOWN" : "UP";
+        try {
+          await BTS.api(`/admin/settings/system-status/${component}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: next, notes: `Updated by admin to ${next}` })
+          });
+          window.location.reload();
+        } catch (error) {
+          msg.textContent = error.message;
+        }
+      };
+    }
+  </script>
+</body>
+</html>

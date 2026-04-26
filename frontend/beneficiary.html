@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beneficiary Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Customer Portal</div>
+      <nav class="nav">
+        <a href="customer.html">Dashboard</a>
+        <a class="active" href="beneficiary.html">Beneficiaries</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+    <main class="content">
+      <header class="topbar"><strong>Beneficiary Management</strong></header>
+      <article class="card">
+        <form id="addForm" class="form-grid">
+          <label>Owner Account Number<input name="accountNumber" required /></label>
+          <label>Beneficiary Account Number<input name="beneficiaryAccountNumber" required /></label>
+          <label>Beneficiary Name<input name="beneficiaryName" required /></label>
+          <label>Nickname<input name="nickname" /></label>
+          <button type="submit">Add Beneficiary</button>
+        </form>
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;" />
+        <form id="removeForm" class="form-grid">
+          <label>Beneficiary ID<input name="beneficiaryId" required /></label>
+          <button class="secondary" type="submit">Remove Beneficiary</button>
+        </form>
+        <p id="msg" class="muted"></p>
+      </article>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    BTS.requireRole("CUSTOMER");
+    const msg = document.getElementById("msg");
+
+    document.getElementById("addForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      try {
+        const data = await BTS.api("/customer/beneficiaries", { method: "POST", body: JSON.stringify(payload) });
+        msg.textContent = `Beneficiary added. ID: ${data.beneficiary_id}`;
+      } catch (error) {
+        msg.textContent = error.message;
+      }
+    });
+
+    document.getElementById("removeForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const beneficiaryId = new FormData(e.target).get("beneficiaryId");
+      try {
+        await BTS.api(`/customer/beneficiaries/${beneficiaryId}`, { method: "DELETE" });
+        msg.textContent = "Beneficiary removed";
+      } catch (error) {
+        msg.textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>

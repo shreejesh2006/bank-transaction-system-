@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - Bank Transaction System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Admin Panel</div>
+      <nav class="nav">
+        <a class="active" href="admin.html">Dashboard</a>
+        <a href="create-account.html">Create Account</a>
+        <a href="reports.html">Reports</a>
+        <a href="audit-logs.html">Audit Logs</a>
+        <a href="demo-panel.html">Demo Panel</a>
+        <a href="recovery-logs.html">Recovery Logs</a>
+        <a href="settings.html">Settings</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <strong>Admin Banking Control Center</strong>
+          <div class="muted">Enterprise monitoring, compliance and operations</div>
+        </div>
+        <div id="adminName" class="muted"></div>
+      </header>
+
+      <section class="grid grid-3">
+        <article class="card"><div class="muted">Total Customers</div><div id="kpiCustomers" class="kpi">0</div></article>
+        <article class="card"><div class="muted">Total Accounts</div><div id="kpiAccounts" class="kpi">0</div></article>
+        <article class="card"><div class="muted">Suspicious Txn Alerts</div><div id="kpiSuspicious" class="kpi">0</div></article>
+      </section>
+
+      <section class="grid grid-2" style="margin-top:16px;">
+        <article class="card">
+          <h3>Recent Transactions</h3>
+          <table>
+            <thead><tr><th>Reference</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody id="txnBody"></tbody>
+          </table>
+        </article>
+        <article class="card">
+          <h3>Branch Performance</h3>
+          <canvas id="branchChart" height="220"></canvas>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const user = BTS.requireRole("ADMIN");
+    document.getElementById("adminName").textContent = `${user.fullName} (${user.role})`;
+
+    async function loadDashboard() {
+      const [customers, accounts, suspicious, transactions, branches] = await Promise.all([
+        BTS.api("/admin/customers"),
+        BTS.api("/admin/accounts"),
+        BTS.api("/admin/suspicious-transactions"),
+        BTS.api("/admin/transactions"),
+        BTS.api("/admin/reports/branches")
+      ]);
+
+      document.getElementById("kpiCustomers").textContent = customers.length;
+      document.getElementById("kpiAccounts").textContent = accounts.length;
+      document.getElementById("kpiSuspicious").textContent = suspicious.length;
+
+      document.getElementById("txnBody").innerHTML = transactions.slice(0, 8).map((t) => `
+        <tr>
+          <td>${t.transaction_ref}</td>
+          <td>${t.transaction_type}</td>
+          <td>${BTS.money(t.amount)}</td>
+          <td><span class="badge ${BTS.badgeForStatus(t.status)}">${t.status}</span></td>
+        </tr>
+      `).join("");
+
+      const canvas = document.getElementById("branchChart");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const max = Math.max(1, ...branches.map((b) => Number(b.total_balance || 0)));
+      const barWidth = 70;
+      const gap = 20;
+      branches.forEach((b, i) => {
+        const x = 20 + i * (barWidth + gap);
+        const h = (Number(b.total_balance || 0) / max) * 150;
+        ctx.fillStyle = "#3b82f6";
+        ctx.fillRect(x, 180 - h, barWidth, h);
+        ctx.fillStyle = "#14213d";
+        ctx.fillText(b.branch_code, x + 10, 200);
+      });
+    }
+
+    loadDashboard().catch((e) => alert(e.message));
+  </script>
+</body>
+</html>

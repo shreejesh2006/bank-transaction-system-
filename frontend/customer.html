@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Dashboard - Bank Transaction System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">BTS Customer Portal</div>
+      <nav class="nav">
+        <a class="active" href="customer.html">Dashboard</a>
+        <a href="account-overview.html">Account Overview</a>
+        <a href="deposit.html">Deposit</a>
+        <a href="withdraw.html">Withdraw</a>
+        <a href="transfer.html">Transfer</a>
+        <a href="beneficiary.html">Beneficiaries</a>
+        <a href="transactions.html">Transactions</a>
+        <a href="settings.html">Profile</a>
+      </nav>
+      <button onclick="BTS.logout()" style="margin-top:16px;width:100%;">Logout</button>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <strong>Customer Banking Dashboard</strong>
+          <div class="muted">Manage funds securely with transaction safety</div>
+        </div>
+        <div id="customerName" class="muted"></div>
+      </header>
+
+      <section class="grid grid-3">
+        <article class="card"><div class="muted">Accounts</div><div id="kpiAccounts" class="kpi">0</div></article>
+        <article class="card"><div class="muted">Available Balance</div><div id="kpiBalance" class="kpi">₹0</div></article>
+        <article class="card"><div class="muted">Recent Transactions</div><div id="kpiTxn" class="kpi">0</div></article>
+      </section>
+
+      <section class="grid grid-2" style="margin-top:16px;">
+        <article class="card">
+          <h3>Accounts</h3>
+          <table>
+            <thead><tr><th>Account</th><th>Type</th><th>Balance</th><th>Status</th></tr></thead>
+            <tbody id="accountBody"></tbody>
+          </table>
+        </article>
+        <article class="card">
+          <h3>Notifications</h3>
+          <div id="notifyBox" class="muted">No notifications found</div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const user = BTS.requireRole("CUSTOMER");
+    document.getElementById("customerName").textContent = `${user.fullName} (${user.role})`;
+
+    async function loadCustomerData() {
+      const [accounts, txns, notifications] = await Promise.all([
+        BTS.api("/customer/accounts"),
+        BTS.api("/customer/transactions"),
+        BTS.api("/customer/notifications")
+      ]);
+
+      document.getElementById("kpiAccounts").textContent = accounts.length;
+      document.getElementById("kpiTxn").textContent = txns.length;
+
+      const totalBalance = accounts.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+      document.getElementById("kpiBalance").textContent = BTS.money(totalBalance);
+
+      document.getElementById("accountBody").innerHTML = accounts.map((a) => `
+        <tr>
+          <td>${a.account_number}</td>
+          <td>${a.account_type}</td>
+          <td>${BTS.money(a.balance)}</td>
+          <td><span class="badge ${BTS.badgeForStatus(a.status)}">${a.status}</span></td>
+        </tr>
+      `).join("");
+
+      if (notifications.length) {
+        document.getElementById("notifyBox").innerHTML = notifications.slice(0, 5).map((n) => `
+          <p><strong>${n.title}:</strong> ${n.message}</p>
+        `).join("");
+      }
+    }
+
+    loadCustomerData().catch((e) => alert(e.message));
+  </script>
+</body>
+</html>
